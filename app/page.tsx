@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import PostCard from "@/components/PostCard";
+import CreatePostModal from "@/components/CreatePostModal";
 import { Button } from "@/components/ui/button";
 
 interface Post {
@@ -33,6 +34,7 @@ export default function Home() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // Fetch posts from API
   const fetchPosts = async () => {
@@ -56,6 +58,19 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handlePostCreated = () => {
+    // Refresh the posts list when a new post is created
+    fetchPosts();
+  };
+
+  const handleOpenCreateModal = () => {
+    setIsCreateModalOpen(true);
+  };
+
+  const handleCloseCreateModal = () => {
+    setIsCreateModalOpen(false);
   };
 
   // Initial data fetch
@@ -117,17 +132,19 @@ export default function Home() {
             <p className="text-sm text-muted-foreground mb-4">
               Share your thoughts with the community
             </p>
-            <Button
-              className="w-full"
-              onClick={() => {
-                // TODO: Implement create post modal
-              }}
-            >
+            <Button className="w-full" onClick={handleOpenCreateModal}>
               Create Post
             </Button>
           </div>
         </div>
       </div>
+
+      {/* Create Post Modal */}
+      <CreatePostModal
+        isOpen={isCreateModalOpen}
+        onClose={handleCloseCreateModal}
+        onPostCreated={handlePostCreated}
+      />
     </main>
   );
 }

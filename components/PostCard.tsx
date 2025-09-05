@@ -1,16 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import Image from "next/image";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-} from "@/components/ui/card";
-import { MessageSquare, Share, Bookmark } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import VotingSection, { VoteType } from "./VotingSection";
+import PostContent from "./PostContent";
 
 interface PostCardProps {
   id: string;
@@ -39,106 +32,143 @@ export default function PostCard({
   imageUrl,
   author,
   subreddit,
+  upvotes: initialUpvotes,
+  downvotes: initialDownvotes,
   commentCount,
   createdAt,
 }: PostCardProps) {
   const [isSaved] = useState(false);
+  const [userVote, setUserVote] = useState<VoteType>(null);
+  const [upvotes, setUpvotes] = useState(initialUpvotes);
+  const [downvotes, setDownvotes] = useState(initialDownvotes);
+  const [isVoting, setIsVoting] = useState(false);
+
+  const score = upvotes - downvotes;
+
+  // Fetch user's vote status when component mounts
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchUserVote = async () => {
+      try {
+        const response = await fetch(`/api/posts/${id}/vote`);
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            // User not authenticated - this is normal
+            if (!cancelled) setUserVote(null);
+            return;
+          }
+          throw new Error(`Failed to fetch vote: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!cancelled) {
+          setUserVote(data.userVote);
+          setUpvotes(data.upvotes);
+          setDownvotes(data.downvotes);
+        }
+      } catch (error) {
+        console.error("Error fetching user vote:", error);
+        if (!cancelled) setUserVote(null);
+      }
+    };
+
+    fetchUserVote();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  // Handle vote button clicks
+  const handleVote = async (voteType: "up" | "down") => {
+    if (isVoting) return;
+
+    setIsVoting(true);
+
+    // Calculate new vote (toggle if same, switch if different)
+    const newVote: VoteType = userVote === voteType ? null : voteType;
+
+    // Store previous state for rollback
+    const previousState = {
+      vote: userVote,
+      upvotes,
+      downvotes,
+    };
+
+    // Update UI optimistically
+    updateVoteState(newVote);
+
+    try {
+      const response = await fetch(`/api/posts/${id}/vote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ voteType: newVote }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to vote");
+      }
+
+      const data = await response.json();
+
+      // Sync with server response
+      setUpvotes(data.upvotes);
+      setDownvotes(data.downvotes);
+      setUserVote(data.userVote);
+    } catch (error) {
+      console.error("Error voting:", error);
+
+      // Rollback optimistic update
+      setUserVote(previousState.vote);
+      setUpvotes(previousState.upvotes);
+      setDownvotes(previousState.downvotes);
+    } finally {
+      setIsVoting(false);
+    }
+  };
+
+  // Update local vote state optimistically
+  const updateVoteState = (newVote: VoteType) => {
+    setUserVote(newVote);
+
+    let newUpvotes = upvotes;
+    let newDownvotes = downvotes;
+
+    // Remove previous vote
+    if (userVote === "up") newUpvotes--;
+    if (userVote === "down") newDownvotes--;
+
+    // Add new vote
+    if (newVote === "up") newUpvotes++;
+    if (newVote === "down") newDownvotes++;
+
+    setUpvotes(newUpvotes);
+    setDownvotes(newDownvotes);
+  };
 
   return (
-    <Card className="mb-4 hover:border-primary/20 transition-colors duration-200">
-      <div className="flex flex-row md:flex-row">
-        {/* Post content */}
-        <div className="flex flex-row md:flex-col md:flex-1 w-full">
-          <CardHeader className="pb-2">
-            <div className="flex items-center text-xs text-muted-foreground mb-1.5">
-              <Link
-                href={`/r/${subreddit.name}`}
-                className="font-medium hover:underline text-primary"
-              >
-                r/{subreddit.name}
-              </Link>
-              <span className="mx-1">•</span>
-              <span>Posted by</span>
-              <Link
-                href={`/u/${author.username}`}
-                className="ml-1 hover:underline font-medium"
-              >
-                u/{author.username}
-              </Link>
-              <span className="mx-1">•</span>
-              <HydrationSafeDate date={createdAt} />
-            </div>
-            <Link
-              href={`/r/${subreddit.name}/comments/${id}`}
-              className="hover:underline"
-            >
-              <h3 className="text-lg font-semibold leading-tight hover:text-primary transition-colors">
-                {title}
-              </h3>
-            </Link>
-          </CardHeader>
-          <CardContent className="py-2">
-            {content && <p className="text-sm line-clamp-4 mb-3">{content}</p>}
-            {imageUrl && (
-              <div className="relative mt-2 overflow-hidden rounded-md w-24 h-24 md:max-h-96 md:w-full md:h-auto">
-                <Image
-                  src={imageUrl}
-                  alt={title}
-                  width={800}
-                  height={600}
-                  className="object-cover w-full h-full md:object-contain"
-                />
-              </div>
-            )}
-          </CardContent>
-          <CardFooter className="pt-0 pb-2">
-            <div className="flex items-center space-x-2 text-xs">
-              <Link href={`/r/${subreddit.name}/comments/${id}`}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                >
-                  <MessageSquare className="h-4 w-4 mr-1.5" />
-                  {commentCount} Comments
-                </Button>
-              </Link>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <Share className="h-4 w-4 mr-1.5" />
-                Share
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className={`h-8 transition-colors ${
-                  isSaved
-                    ? "text-yellow-600 hover:text-yellow-700"
-                    : "text-muted-foreground hover:text-foreground"
-                } hover:bg-muted`}
-              >
-                <Bookmark
-                  className={`h-4 w-4 mr-1.5 ${isSaved ? "fill-current" : ""}`}
-                />
-                {isSaved ? "Saved" : "Save"}
-              </Button>
-            </div>
-          </CardFooter>
-        </div>
+    <Card className="mb-4 hover:border-primary/20">
+      <div className="flex flex-row">
+        <VotingSection
+          userVote={userVote}
+          score={score}
+          isVoting={isVoting}
+          onUpvote={() => handleVote("up")}
+          onDownvote={() => handleVote("down")}
+        />
+
+        <PostContent
+          title={title}
+          content={content}
+          imageUrl={imageUrl}
+          author={author}
+          subreddit={subreddit}
+          commentCount={commentCount}
+          createdAt={createdAt}
+          isSaved={isSaved}
+        />
       </div>
     </Card>
   );
 }
-
-const HydrationSafeDate = ({ date }: { date: Date }) => {
-  const [formatted, setFormatted] = useState<string>("");
-
-  useEffect(() => {
-    setFormatted(date.toLocaleString()); // runs only on client
-  }, [date]);
-
-  return <span title={formatted}>{formatted}</span>;
-};

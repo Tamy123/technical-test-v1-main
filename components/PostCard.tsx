@@ -96,7 +96,7 @@ export default function PostCard({
       downvotes,
     };
 
-    // Update UI optimistically
+    // Update UI
     updateVoteState(newVote);
 
     try {
@@ -119,7 +119,7 @@ export default function PostCard({
     } catch (error) {
       console.error("Error voting:", error);
 
-      // Rollback optimistic update
+      // Rollback update
       setUserVote(previousState.vote);
       setUpvotes(previousState.upvotes);
       setDownvotes(previousState.downvotes);
@@ -128,7 +128,7 @@ export default function PostCard({
     }
   };
 
-  // Update local vote state optimistically
+  // Update local vote state
   const updateVoteState = (newVote: VoteType) => {
     setUserVote(newVote);
 

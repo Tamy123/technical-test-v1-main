@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 
-// Form validation schema
+
 const formSchema = z.object({
   title: z
     .string()
@@ -56,11 +56,10 @@ export default function CreatePostModal({
   const { register, handleSubmit, formState, watch, reset } = form;
   const { errors, isSubmitting } = formState;
 
-  // Watch for character counting
   const titleValue = watch("title") || "";
   const contentValue = watch("content") || "";
 
-  // Character count styling helper
+
   const getCharCountClass = (current: number, limit: number) => {
     const percentage = (current / limit) * 100;
     if (percentage >= 100) return "text-red-600 font-medium";
@@ -69,7 +68,7 @@ export default function CreatePostModal({
     return "text-muted-foreground";
   };
 
-  // Form submission
+
   const onSubmit = async (data: FormData) => {
     try {
       const response = await fetch("/api/posts", {
@@ -99,7 +98,7 @@ export default function CreatePostModal({
     }
   };
 
-  // Handle modal close
+
   const handleClose = () => {
     if (!isSubmitting) {
       reset();
